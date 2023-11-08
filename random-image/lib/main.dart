@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'dart:math';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:gallery_saver/gallery_saver.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,27 +16,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Flutter Demo - Random cats image',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Random cats image'),
     );
   }
 }
@@ -47,15 +36,48 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String imgUrl = 'https://source.unsplash.com/random/700×700/?cat';
-  String image = '';
-  final _random = Random();
+  late String imageFile = '';
 
-  void _randomImage() {
-    final number = 100 + _random.nextInt(900);
+  @override
+  void initState() {
+    super.initState();
+    getImage('https://source.unsplash.com/random/700x700/?cat', 'cat-700.jpg');
+  }
+
+  Future<void> getImage(String imageURL, String savePathFile) async {
     setState(() {
-      image = "https://source.unsplash.com/random/$number×$number/?cat";
+      imageFile = '';
     });
+    final tempDir = await getTemporaryDirectory();
+    final savePath = '${tempDir.path}/$savePathFile';
+    await Dio().download(imageURL, savePath);
+    setState(() {
+      imageFile = savePath;
+    });
+  }
+
+  Future<void> deleteImage(String deletePathFile) async {
+    try {
+      // Delete the previous image before saved new image.
+      final file = File(imageFile);
+      await file.delete();
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _randomImage() async {
+    final number = 100 + Random().nextInt(900);
+    final savePathFile = 'cat-$number.jpg';
+    await getImage(
+        'https://source.unsplash.com/random/${number}x${number}/?cat',
+        savePathFile);
+  }
+
+  Future<void> _handleDownload(context) async {
+    await GallerySaver.saveImage(imageFile, toDcim: true);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Downloaded to Gallery!')));
   }
 
   @override
@@ -66,14 +88,18 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text(
-              'Random cats 😺',
+              'Random Meowww 😺',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w300),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
-              child: Image.network(
-                image == '' ? imgUrl : image,
-              ),
+              padding: const EdgeInsets.all(40),
+              child: imageFile != ''
+                  ? Image.file(File(imageFile))
+                  : Image.asset(
+                      'assets/images/loading-image.png',
+                      height: 40,
+                      width: 40,
+                    ),
             ),
             const Padding(padding: EdgeInsets.all(10)),
             Padding(
@@ -81,15 +107,15 @@ class _MyHomePageState extends State<MyHomePage> {
               child: ElevatedButton(
                   onPressed: _randomImage,
                   style: TextButton.styleFrom(
-                      shadowColor: Color.fromRGBO(37, 42, 52, 1),
+                      shadowColor: const Color.fromRGBO(37, 42, 52, 1),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(5)),
-                      backgroundColor: Color.fromRGBO(37, 42, 52, 1)),
+                      backgroundColor: const Color.fromRGBO(37, 42, 52, 1)),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
                       Text(
-                        'Get new image',
+                        'More cat',
                         style: TextStyle(
                             color: Color.fromRGBO(255, 255, 255, 1),
                             fontWeight: FontWeight.w300),
@@ -102,6 +128,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   )),
             ),
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              onPressed: () => _handleDownload(context),
+            )
           ],
         ),
       ),
